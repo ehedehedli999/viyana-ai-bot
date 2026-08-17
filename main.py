@@ -231,7 +231,7 @@ def run_translation(text):
             "Günlük bütçe sınırına ulaşıldı: $%.6f",
             current_cost,
         )
-        return ""
+        return None  # sessizce dur (bütçe bitti)
 
     try:
         openai_client = get_openai_client()
@@ -298,7 +298,7 @@ def run_translation(text):
             e,
             exc_info=True,
         )
-        return ""
+        return "⚠️ HATA (debug): " + str(e)
 
 
 # =========================================================
@@ -351,6 +351,10 @@ async def handle_message(
     )
 
     translation = run_translation(text)
+
+    if translation is None:
+        # Günlük bütçe doldu, sessizce geç.
+        return
 
     if not translation:
         return
