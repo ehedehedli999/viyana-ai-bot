@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # =========================================================
 # ENVIRONMENT VARIABLES
-# Render Dashboard'a yazılacak:
+# Render Dashboard'da:
 #
 # TELEGRAM_BOT_TOKEN
 # OPENAI_API_KEY
@@ -38,29 +38,25 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 # =========================================================
-# OPENAI CONFIG
+# OPENAI
 # =========================================================
 
-# Çok düşük maliyetli model.
 OPENAI_MODEL = "gpt-5-nano"
 
-# Günlük güvenlik bütçesi
+# Günlük maksimum hedef bütçe
 DAILY_BUDGET_USD = 0.20
 
 # Güvenlik payı bırakıyoruz.
-# Kod yaklaşık $0.18'e ulaştığında yeni istekleri durdurur.
+# Yaklaşık $0.18 seviyesinde yeni istekleri durduruyoruz.
 DAILY_SOFT_LIMIT_USD = 0.18
 
-# gpt-5-nano fiyatları:
-# Input:  $0.05 / 1M tokens
-# Output: $0.40 / 1M tokens
-
+# GPT-5 nano fiyatları
 INPUT_PRICE_PER_MILLION = 0.05
 OUTPUT_PRICE_PER_MILLION = 0.40
 
 
 # =========================================================
-# GÜNLÜK KULLANIM TAKİBİ
+# DAILY USAGE
 # =========================================================
 
 daily_input_tokens = 0
@@ -83,7 +79,7 @@ def reset_daily_usage_if_needed():
         logger.info("Günlük API kullanım sayacı sıfırlandı.")
 
 
-def calculate_cost(input_tokens: int, output_tokens: int) -> float:
+def calculate_cost(input_tokens, output_tokens):
     input_cost = (
         input_tokens / 1_000_000
     ) * INPUT_PRICE_PER_MILLION
@@ -95,7 +91,7 @@ def calculate_cost(input_tokens: int, output_tokens: int) -> float:
     return input_cost + output_cost
 
 
-def current_daily_cost() -> float:
+def current_daily_cost():
     return calculate_cost(
         daily_input_tokens,
         daily_output_tokens,
@@ -107,35 +103,38 @@ def current_daily_cost() -> float:
 # =========================================================
 
 TRANSLATION_PROMPT = """
-Sen profesyonel bir simultane çeviri motorusun.
+Sen yalnızca profesyonel bir otomatik çeviri motorusun.
 
 GÖREV:
 
-1. Mesaj Türkçeyse SADECE Rusçaya çevir.
-2. Mesaj Rusçaysa SADECE Türkçeye çevir.
-3. Mesaj Azerbaycancaysa hem Türkçeye hem Rusçaya çevir.
-4. Mesaj İngilizce, Almanca veya başka bir dildeyse hem Türkçeye hem Rusçaya çevir.
+1. Türkçe mesajı SADECE Rusçaya çevir.
+2. Rusça mesajı SADECE Türkçeye çevir.
+3. Azerbaycanca mesajı hem Türkçeye hem Rusçaya çevir.
+4. İngilizce, Almanca veya başka bir dildeki mesajı
+   hem Türkçeye hem Rusçaya çevir.
 
 ÇEVİRİ KALİTESİ:
 
-- Ana dili konuşan insan seviyesinde, C2 düzeyinde çeviri yap.
-- Anlamı eksiksiz koru.
-- Kelime kelime mekanik çeviri yapma; hedef dilde doğal ve doğru ifade kullan.
-- Ancak kaynak metinde olmayan hiçbir anlam ekleme.
+- C2 ve ana dil seviyesinde çeviri yap.
+- Hedef dilde doğal, akıcı ve doğru konuşma biçimini kullan.
+- Kaynak metnin anlamını tamamen koru.
+- Kaynakta olmayan hiçbir bilgi ekleme.
 - Yorum yapma.
 - Açıklama yapma.
 - Özetleme yapma.
-- Cevap verme.
+- Soruyu cevaplama.
+- Sohbet etme.
 - Selamlaşma ekleme.
-- "İşte çeviri:", "Tabii:", "Elbette:" gibi ifadeler ekleme.
-- Kullanıcının cümlesini değiştirme veya güzelleştirme.
-- Argo, günlük konuşma, küfür veya kaba ifadeler varsa anlamını koru.
-- Özel isimleri mümkün olduğunca aynen koru.
-- Sayıları, tarihleri ve önemli bilgileri değiştirme.
-- Emojileri mümkün olduğunca koru.
-- Mesaj çok kısa olsa bile sadece çevirisini ver.
+- "İşte çeviri", "Tabii", "Elbette" gibi ifadeler ekleme.
+- Kullanıcının cümlesini gereksiz yere değiştirme.
+- Argo ve günlük konuşma ifadelerinin anlamını koru.
+- Küfür varsa anlamını sansürlemeden ve değiştirmeden aktar.
+- Özel isimleri koru.
+- Sayıları ve tarihleri değiştirme.
+- Emoji ve sembolleri mümkün olduğunca koru.
+- Çok kısa mesajları bile yalnızca çevir.
 
-ÖRNEK:
+ÖRNEKLER:
 
 Türkçe:
 Merhaba
@@ -148,6 +147,12 @@ Tamam
 
 ÇIKTI:
 🇷🇺 Хорошо
+
+Türkçe:
+Nasılsın?
+
+ÇIKTI:
+🇷🇺 Как ты?
 
 Rusça:
 Привет
@@ -171,7 +176,7 @@ Salam, necəsən?
 KESİN KURAL:
 
 Çıktıda yalnızca çeviri bulunmalıdır.
-Başka hiçbir açıklama veya cümle yazma.
+Başka hiçbir açıklama, yorum veya cümle yazma.
 """
 
 
@@ -179,15 +184,25 @@ Başka hiçbir açıklama veya cümle yazma.
 # OPENAI CLIENT
 # =========================================================
 
+client = None
+
+
 def get_openai_client():
-    return OpenAI(api_key=OPENAI_API_KEY)
+    global client
+
+    if client is None:
+        client = OpenAI(
+            api_key=OPENAI_API_KEY
+        )
+
+    return client
 
 
 # =========================================================
-# RESPONSE TEMİZLEME
+# CLEAN RESPONSE
 # =========================================================
 
-def clean_response(text: str) -> str:
+def clean_response(text):
     if not text:
         return ""
 
@@ -205,24 +220,25 @@ def clean_response(text: str) -> str:
 # TRANSLATION
 # =========================================================
 
-def run_translation(text: str) -> str:
+def run_translation(text):
     global daily_input_tokens
     global daily_output_tokens
 
     reset_daily_usage_if_needed()
 
-    # Günlük limite ulaşıldıysa API çağrısı yapma.
-    if current_daily_cost() >= DAILY_SOFT_LIMIT_USD:
+    current_cost = current_daily_cost()
+
+    if current_cost >= DAILY_SOFT_LIMIT_USD:
         logger.warning(
-            "Günlük API bütçe sınırına ulaşıldı: $%.6f",
-            current_daily_cost(),
+            "Günlük bütçe sınırına ulaşıldı: $%.6f",
+            current_cost,
         )
         return ""
 
     try:
-        client = get_openai_client()
+        openai_client = get_openai_client()
 
-        response = client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[
                 {
@@ -238,7 +254,6 @@ def run_translation(text: str) -> str:
             max_tokens=300,
         )
 
-        # Token kullanımını al
         usage = getattr(response, "usage", None)
 
         if usage:
@@ -258,11 +273,15 @@ def run_translation(text: str) -> str:
             daily_output_tokens += output_tokens
 
             logger.info(
-                "Translation usage: input=%s output=%s daily_cost=$%.6f",
+                "API usage | input=%s | output=%s | "
+                "daily_cost=$%.6f",
                 input_tokens,
                 output_tokens,
                 current_daily_cost(),
             )
+
+        if not response.choices:
+            return ""
 
         output = response.choices[0].message.content
 
@@ -270,7 +289,7 @@ def run_translation(text: str) -> str:
 
     except Exception as e:
         logger.error(
-            "Translation Error: %s",
+            "OpenAI Translation Error: %s",
             e,
             exc_info=True,
         )
@@ -287,7 +306,7 @@ async def about_handler(
 ):
     about_text = (
         "🤖 Viyana AI\n\n"
-        "Ben EHET tarafından oluşturulmuş "
+        "Ben EHED tarafından oluşturulmuş "
         "Viyana AI otomatik çeviri botuyum."
     )
 
@@ -297,7 +316,7 @@ async def about_handler(
 
 
 # =========================================================
-# MESAJ HANDLER
+# MESSAGE HANDLER
 # =========================================================
 
 async def handle_message(
@@ -306,7 +325,10 @@ async def handle_message(
 ):
     message = update.effective_message
 
-    if not message or not message.text:
+    if not message:
+        return
+
+    if not message.text:
         return
 
     text = message.text.strip()
@@ -314,7 +336,7 @@ async def handle_message(
     if not text:
         return
 
-    # Komutlar burada işlenmez.
+    # Telegram komutlarını otomatik çevirme.
     if text.startswith("/"):
         return
 
@@ -325,11 +347,13 @@ async def handle_message(
 
     translation = run_translation(text)
 
-    if translation:
-        await message.reply_text(
-            translation,
-            disable_web_page_preview=True,
-        )
+    if not translation:
+        return
+
+    await message.reply_text(
+        translation,
+        disable_web_page_preview=True,
+    )
 
 
 # =========================================================
@@ -369,7 +393,8 @@ def main():
         .build()
     )
 
-    # SADECE hakkında komutu
+    # SADECE /hakkinda komutu.
+    # /start YOK.
     app.add_handler(
         CommandHandler(
             "hakkinda",
@@ -377,7 +402,7 @@ def main():
         )
     )
 
-    # Otomatik çeviri
+    # Otomatik çeviri.
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -393,10 +418,16 @@ def main():
         "🤖 Viyana AI otomatik çeviri botu aktif!"
     )
 
+    # Webhook kullanmıyoruz.
+    # Sadece polling.
     app.run_polling(
         drop_pending_updates=True
     )
 
+
+# =========================================================
+# START
+# =========================================================
 
 if __name__ == "__main__":
     main()
