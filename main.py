@@ -43,12 +43,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 OPENAI_MODEL = "gpt-5-nano"
 
-# Günlük hedef maksimum bütçe
+# Günlük maksimum bütçe (kesin sınır)
 DAILY_BUDGET_USD = 0.20
-
-# Güvenlik payı
-# Yaklaşık 18 cent'e ulaşıldığında yeni istek durur.
-DAILY_SOFT_LIMIT_USD = 0.18
 
 # GPT-5 nano fiyatları
 INPUT_PRICE_PER_MILLION = 0.05
@@ -230,7 +226,7 @@ def run_translation(text):
 
     current_cost = current_daily_cost()
 
-    if current_cost >= DAILY_SOFT_LIMIT_USD:
+    if current_cost >= DAILY_BUDGET_USD:
         logger.warning(
             "Günlük bütçe sınırına ulaşıldı: $%.6f",
             current_cost,
