@@ -248,7 +248,8 @@ def run_translation(text):
                     "content": text,
                 },
             ],
-            max_completion_tokens=300,
+            max_completion_tokens=800,
+            reasoning_effort="minimal",
         )
 
         # =================================================
