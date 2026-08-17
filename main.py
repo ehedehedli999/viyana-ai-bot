@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # =========================================================
 # ENVIRONMENT VARIABLES
-# Render Dashboard'da:
+# Render Dashboard:
 #
 # TELEGRAM_BOT_TOKEN
 # OPENAI_API_KEY
@@ -38,16 +38,16 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
 # =========================================================
-# OPENAI
+# OPENAI CONFIG
 # =========================================================
 
 OPENAI_MODEL = "gpt-5-nano"
 
-# Günlük maksimum hedef bütçe
+# Günlük hedef maksimum bütçe
 DAILY_BUDGET_USD = 0.20
 
-# Güvenlik payı bırakıyoruz.
-# Yaklaşık $0.18 seviyesinde yeni istekleri durduruyoruz.
+# Güvenlik payı
+# Yaklaşık 18 cent'e ulaşıldığında yeni istek durur.
 DAILY_SOFT_LIMIT_USD = 0.18
 
 # GPT-5 nano fiyatları
@@ -76,7 +76,9 @@ def reset_daily_usage_if_needed():
         daily_input_tokens = 0
         daily_output_tokens = 0
 
-        logger.info("Günlük API kullanım sayacı sıfırlandı.")
+        logger.info(
+            "Günlük API kullanım sayacı sıfırlandı."
+        )
 
 
 def calculate_cost(input_tokens, output_tokens):
@@ -116,7 +118,7 @@ GÖREV:
 ÇEVİRİ KALİTESİ:
 
 - C2 ve ana dil seviyesinde çeviri yap.
-- Hedef dilde doğal, akıcı ve doğru konuşma biçimini kullan.
+- Hedef dilde doğal, akıcı ve doğru ifade kullan.
 - Kaynak metnin anlamını tamamen koru.
 - Kaynakta olmayan hiçbir bilgi ekleme.
 - Yorum yapma.
@@ -128,7 +130,7 @@ GÖREV:
 - "İşte çeviri", "Tabii", "Elbette" gibi ifadeler ekleme.
 - Kullanıcının cümlesini gereksiz yere değiştirme.
 - Argo ve günlük konuşma ifadelerinin anlamını koru.
-- Küfür varsa anlamını sansürlemeden ve değiştirmeden aktar.
+- Küfür varsa anlamını değiştirmeden aktar.
 - Özel isimleri koru.
 - Sayıları ve tarihleri değiştirme.
 - Emoji ve sembolleri mümkün olduğunca koru.
@@ -250,9 +252,12 @@ def run_translation(text):
                     "content": text,
                 },
             ],
-            temperature=0,
-            max_tokens=300,
+            max_completion_tokens=300,
         )
+
+        # =================================================
+        # TOKEN KULLANIMI
+        # =================================================
 
         usage = getattr(response, "usage", None)
 
@@ -279,6 +284,10 @@ def run_translation(text):
                 output_tokens,
                 current_daily_cost(),
             )
+
+        # =================================================
+        # RESPONSE
+        # =================================================
 
         if not response.choices:
             return ""
@@ -336,7 +345,7 @@ async def handle_message(
     if not text:
         return
 
-    # Telegram komutlarını otomatik çevirme.
+    # Komutları çevirme
     if text.startswith("/"):
         return
 
@@ -393,8 +402,8 @@ def main():
         .build()
     )
 
-    # SADECE /hakkinda komutu.
-    # /start YOK.
+    # Sadece /hakkinda
+    # /start YOK
     app.add_handler(
         CommandHandler(
             "hakkinda",
@@ -402,7 +411,7 @@ def main():
         )
     )
 
-    # Otomatik çeviri.
+    # Otomatik çeviri
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -418,8 +427,7 @@ def main():
         "🤖 Viyana AI otomatik çeviri botu aktif!"
     )
 
-    # Webhook kullanmıyoruz.
-    # Sadece polling.
+    # Sadece polling kullanılıyor.
     app.run_polling(
         drop_pending_updates=True
     )
