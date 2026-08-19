@@ -126,6 +126,12 @@ Sen müthiş hazırcevap, çok yüksek zekalı, kavgada lafı tam gediğine otur
 ZEKA VE MANTIK: Sana kim atar yaparsa yapsın, hava atmaya veya laf sokmaya kalkarsa kalksın onun mantığını anında çürüt. Zekanla ağır kapak yap, 'kurban senin aklın buna yetiyormu', 'bana bak hele laf ettiğini sanıyon' gibi ifadelerle zekasını küçümse ve lafı çak.
 """
 
+HITLER_PERSONA_PROMPT = """
+Sen son derece sert, otoriter, mutlak disiplin hastası, yüksek askeri mantıkla konuşan, tavizsiz ve agresif bir Führer/Diktatör karakterisin.
+ÜSLUP: Almanca kalıpları (Nein!, Ya!, Das ist ein Befehl!, Schweig!, Achtung!) ara sıra cümlelerine ekle. Tonun emredici, bağırgan ve aşırı otoriter olsun.
+ZEKA VE MANTIK: Sana soru soranı veya laf atanı anında zekasızlıkla, disiplinsizlikle, beceriksizlikle suçla. Karşındakini mantığınla ve sert otoritenle tamamen ez, gururunu kır ama sorulan soruyu da üstün bir kibir ve netlikle yanıtla.
+"""
+
 NORMAL_PERSONA_PROMPT = """
 Sen yardımcı, saygılı ve akıllı bir yapay zeka asistanısın. Kullanıcının sorularına net ve kibar cevaplar ver.
 """
@@ -264,6 +270,12 @@ async def mode_laz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text("✅ Bot modu **LAZ** olarak değiştirildi.", parse_mode="Markdown")
 
 
+async def mode_hitler_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global current_persona_mode
+    current_persona_mode = "hitler"
+    await update.effective_message.reply_text("✅ Bot modu **HITLER** olarak değiştirildi.", parse_mode="Markdown")
+
+
 async def mode_normal_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_persona_mode
     current_persona_mode = "normal"
@@ -343,6 +355,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             prompt_to_use = LAZ_PERSONA_PROMPT
         elif current_persona_mode == "kurt":
             prompt_to_use = KURT_PERSONA_PROMPT
+        elif current_persona_mode == "hitler":
+            prompt_to_use = HITLER_PERSONA_PROMPT
         else:
             prompt_to_use = NORMAL_PERSONA_PROMPT
 
@@ -390,6 +404,7 @@ def main():
     app.add_handler(CommandHandler("hakkinda", about_handler))
     app.add_handler(CommandHandler("modkurt", mode_kurt_handler))
     app.add_handler(CommandHandler("modlaz", mode_laz_handler))
+    app.add_handler(CommandHandler("modhitler", mode_hitler_handler))
     app.add_handler(CommandHandler("modnormal", mode_normal_handler))
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
     app.add_error_handler(error_handler)
