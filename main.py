@@ -40,12 +40,12 @@ current_persona_mode = "laz"
 # OPENAI CONFIG
 # =========================================================
 
-OPENAI_MODEL = "gpt-5-nano"
+OPENAI_MODEL = "gpt-4o-mini"
 
 DAILY_BUDGET_USD = 0.20
 
-INPUT_PRICE_PER_MILLION = 0.05
-OUTPUT_PRICE_PER_MILLION = 0.40
+INPUT_PRICE_PER_MILLION = 0.15
+OUTPUT_PRICE_PER_MILLION = 0.60
 
 
 # =========================================================
@@ -90,7 +90,7 @@ def current_daily_cost():
 # =========================================================
 
 TRANSLATION_PROMPT = """
-Sen doğrudan çalışan profesyonel bir çevirmensin. Asla düşünme, analiz yapma, açıklama ekleme.
+Sen doğrudan çalışan profesyonel bir çevirmensin. Asla açıklama ekleme, yorum yapma, selamlama.
 Görevin: Gelen metni tespit et ve kaynak dil dışındaki 2 ana dile çevir.
 
 Gelen metin TÜRKÇE ise:
@@ -110,7 +110,7 @@ Diğer tüm diller için:
 🇷🇺 [Rusça]
 🇩🇪 [Almanca]
 
-Kural: Sadece bayrak emojisi ve çeviriyi yaz. Tek satır kullan. Başka hiçbir şey yazma!
+Kural: Sadece bayrak emojisi ve çeviriyi yaz. Tek satır kullan.
 """
 
 LAZ_PERSONA_PROMPT = """
@@ -210,7 +210,8 @@ def ask_openai(system_prompt, user_text):
                     "content": user_text,
                 },
             ],
-            max_completion_tokens=200,
+            max_tokens=200,
+            temperature=0.3,
         )
 
         usage = getattr(response, "usage", None)
