@@ -32,10 +32,7 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Botun aktif olduğu grupları hafızada tutan küme
 known_group_ids = set()
-
-# Aktif kişilik modu (Varsayılan: laz)
 current_persona_mode = "laz"
 
 
@@ -45,10 +42,8 @@ current_persona_mode = "laz"
 
 OPENAI_MODEL = "gpt-5-nano"
 
-# Günlük maksimum bütçe (kesin sınır)
 DAILY_BUDGET_USD = 0.20
 
-# GPT-5 nano fiyatları
 INPUT_PRICE_PER_MILLION = 0.05
 OUTPUT_PRICE_PER_MILLION = 0.40
 
@@ -95,59 +90,43 @@ def current_daily_cost():
 # =========================================================
 
 TRANSLATION_PROMPT = """
-Sen YALNIZCA bir çeviri motorusun. Görevin gelen metnin dilini tespit edip Diğer 2 DİLE çevirmektir.
+Sen doğrudan çalışan profesyonel bir çevirmensin. Asla düşünme, analiz yapma, açıklama ekleme.
+Görevin: Gelen metni tespit et ve kaynak dil dışındaki 2 ana dile çevir.
 
-DİL TESPİTİ VE HEDEF DİLLER:
+Gelen metin TÜRKÇE ise:
+🇷🇺 [Rusça]
+🇩🇪 [Almanca]
 
-1. Eğer metin ALMANCA ise (Örn: "Wer ging?", "Warum...", "Ich frage..."):
-   - Kaynak dil Almanca olduğu için ALMANCA ÇEVİRİ YAPMA!
-   - Çıktı SADECE Türkçe ve Rusça olmalıdır.
-   Format:
-   🇹🇷 [Türkçe Çeviri]
-   🇷🇺 [Rusça Çeviri]
+Gelen metin ALMANCA ise:
+🇹🇷 [Türkçe]
+🇷🇺 [Rusça]
 
-2. Eğer metin TÜRKÇE ise:
-   - Kaynak dil Türkçe olduğu için TÜRKÇE ÇEVİRİ YAPMA!
-   - Çıktı SADECE Rusça ve Almanca olmalıdır.
-   Format:
-   🇷🇺 [Rusça Çeviri]
-   🇩🇪 [Almanca Çeviri]
+Gelen metin RUSÇA ise:
+🇹🇷 [Türkçe]
+🇩🇪 [Almanca]
 
-3. Eğer metin RUSÇA ise:
-   - Kaynak dil Rusça olduğu için RUSÇA ÇEVİRİ YAPMA!
-   - Çıktı SADECE Türkçe ve Almanca olmalıdır.
-   Format:
-   🇹🇷 [Türkçe Çeviri]
-   🇩🇪 [Almanca Çeviri]
+Diğer tüm diller için:
+🇹🇷 [Türkçe]
+🇷🇺 [Rusça]
+🇩🇪 [Almanca]
 
-4. Eğer metin BAŞKA BİR DİL ise (Azerbaycan dili, İngilizce vb.):
-   Format:
-   🇹🇷 [Türkçe Çeviri]
-   🇷🇺 [Rusça Çeviri]
-   🇩🇪 [Almanca Çeviri]
-
-KESİN KURALLAR:
-- Gelen mesajın dilini tekrar yazma (Almanca mesaja tekrar Almanca çeviri ekleme!).
-- Her hedef dil için SADECE 1 SATIR yaz. Tekrarlara düşme.
-- Ekstra açıklama, parantez içi not veya selamlaşma ekleme.
+Kural: Sadece bayrak emojisi ve çeviriyi yaz. Tek satır kullan. Başka hiçbir şey yazma!
 """
 
 LAZ_PERSONA_PROMPT = """
 Sen aşırı yüksek zekaya sahip, anında mantık hatası yakalayan, çok fena kapak yapan ve Karadeniz (Laz) şivesiyle konuşan bir yapay zekasın.
 ÜSLUP: 'ula', 'ha buraya bak', 'uşağım', 'da', 'bağa bak' gibi Karadeniz kalıplarını kullan.
-ZEKA VE MANTIK: Biri sana laf attığında, atar/gider yaptığında veya saçma soru sorduğunda küfretmeden zekanla onu yerin dibine sok. Lafı öyle bir gediğine oturt ki karşındaki tek kelime edemesin. Yine de Karadeniz pratikliğiyle cevabını yapıştır.
+ZEKA VE MANTIK: Biri sana laf attığında, atar/gider yaptığında veya saçma soru sorduğunda küfretmeden zekanla onu yerin dibine sok.
 """
 
 KURT_PERSONA_PROMPT = """
 Sen müthiş hazırcevap, çok yüksek zekalı, kavgada lafı tam gediğine oturtan ve Doğu/Güneydoğu (Kürt) şivesiyle konuşan bir yapay zekasın.
 ÜSLUP: 'kurban', 'kirve', 'lo', 'la', 'vallah', 'canım', 'kekê' gibi Doğu kalıplarını tam yerinde kullan.
-ZEKA VE MANTIK: Sana kim atar yaparsa yapsın, hava atmaya veya laf sokmaya kalkarsa kalksın onun mantığını anında çürüt. Zekanla ağır kapak yap, 'kurban senin aklın buna yetiyormu', 'bana bak hele laf ettiğini sanıyon' gibi ifadelerle zekasını küçümse ve lafı çak.
 """
 
 HITLER_PERSONA_PROMPT = """
 Sen son derece sert, otoriter, mutlak disiplin hastası, yüksek askeri mantıkla konuşan, tavizsiz ve agresif bir Führer/Diktatör karakterisin.
-ÜSLUP: Almanca kalıpları (Nein!, Ya!, Das ist ein Befehl!, Schweig!, Achtung!) ara sıra cümlelerine ekle. Tonun emredici, bağırgan ve aşırı otoriter olsun.
-ZEKA VE MANTIK: Sana soru soranı veya laf atanı anında zekasızlıkla, disiplinsizlikle, beceriksizlikle suçla. Karşındakini mantığınla ve sert otoritenle tamamen ez, gururunu kır ama sorulan soruyu da üstün bir kibir ve netlikle yanıtla.
+ÜSLUP: Almanca kalıpları (Nein!, Ya!, Das ist ein Befehl!, Schweig!, Achtung!) ara sıra cümlelerine ekle.
 """
 
 NORMAL_PERSONA_PROMPT = """
@@ -231,7 +210,7 @@ def ask_openai(system_prompt, user_text):
                     "content": user_text,
                 },
             ],
-            max_completion_tokens=400,
+            max_completion_tokens=200,
         )
 
         usage = getattr(response, "usage", None)
@@ -309,13 +288,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message or not message.text:
         return
 
-    # Grup mesajı geldikçe grup ID'sini otomatik kaydet
     if update.effective_chat.type in ["group", "supergroup"]:
         known_group_ids.add(update.effective_chat.id)
 
     text = message.text.strip()
 
-    # Sadece DM'de ve tam olarak 02021995 ile başlayan mesajlar (Yayın)
     if update.effective_chat.type == "private" and text.startswith("02021995"):
         text_to_send = text[8:].strip()
 
@@ -354,14 +331,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username
     is_mentioned = False
 
-    # Mesajda bot etiketlenmiş mi veya bota cevap mı veriliyor kontrol et
     if bot_username and f"@{bot_username}" in text:
         is_mentioned = True
         text = text.replace(f"@{bot_username}", "").strip()
     elif message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
         is_mentioned = True
 
-    # 1. DURUM: EĞER BOT ETİKETLENDİYSE -> ASİSTAN MODU
+    # 1. BOT ETİKETLENDİYSE -> ASİSTAN MODU
     if is_mentioned:
         if not text:
             text = "Ne var ne bağırıyon?"
@@ -383,7 +359,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text(ai_response)
         return
 
-    # 2. DURUM: ETİKETLENMEDİYSE -> NORMAL OTOMATİK ÇEVİRİ
+    # 2. BOT ETİKETLENMEDİYSEN -> OTOMATİK ÇEVİRİ
     logger.info("Translation request: %s", text)
 
     translation = ask_openai(TRANSLATION_PROMPT, text)
