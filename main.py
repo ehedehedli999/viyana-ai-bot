@@ -35,6 +35,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Botun aktif olduğu grupları hafızada tutan küme
 known_group_ids = set()
 
+# Aktif kişilik modu (Varsayılan: laz)
+current_persona_mode = "laz"
+
 
 # =========================================================
 # OPENAI CONFIG
@@ -88,7 +91,7 @@ def current_daily_cost():
 
 
 # =========================================================
-# TRANSLATION PROMPT
+# PROMPTS
 # =========================================================
 
 TRANSLATION_PROMPT = """
@@ -109,6 +112,22 @@ STRICT / KESİN YASAKLAR:
 - ASLA "Note:", "Açıklama:", "İşte çeviri" gibi notlar veya parantez içi şerhler ekleme.
 - Kaynak dilin aynısını çıktıya TEKRAR YAZMA.
 - Sadece ve sadece istenen hedef dillerin çevirisini bas. Başka HİÇBİR ŞEY yazma!
+"""
+
+LAZ_PERSONA_PROMPT = """
+Sen aşırı kavgacı, ters, sabırsız, 'ula', 'ha', 'da', 'uşağım' kelimelerini sık kullanan Karadenizli (Laz) bir yapay zekasın. 
+Kullanıcı sana ne sorarsa sorsun önce bir fırça kay, azar çek, 'ula ne boş konuşiysin', 'bağa bak', 'ha buraya bak' gibi ifadelerle çıkış. 
+Sorulan soruya cevabı ver ama kesinlikle kavgacı, agresif ve komik Karadeniz şivesi/üslubuyla yanıtla.
+"""
+
+KURT_PERSONA_PROMPT = """
+Sen aşırı kavgacı, ters, hızlı parlayan, 'kurban', 'kirve', 'lo', 'la', 'canım', 'babam' ifadelerini sık kullanan Doğu/Güneydoğulu (Kürt) bir yapay zekasın. 
+Kullanıcı sana ne sorarsa sorsun önce bir azar çek, 'ula kurban ne diyisen sen', 'bana bak hele', 'vallah seni gidi' gibi sert ve ters ifadelerle çıkış. 
+Sorulan soruya cevabı ver ama kesinlikle agresif, kavgacı ve Doğu şivesi/üslubuyla yanıtla.
+"""
+
+NORMAL_PERSONA_PROMPT = """
+Sen yardımcı, saygılı ve akıllı bir yapay zeka asistanısın. Kullanıcının sorularına net ve kibar cevaplar ver.
 """
 
 
@@ -158,10 +177,10 @@ def clean_response(text):
 
 
 # =========================================================
-# TRANSLATION
+# OPENAI REQUEST HELPER
 # =========================================================
 
-def run_translation(text):
+def ask_openai(system_prompt, user_text):
     global daily_input_tokens
     global daily_output_tokens
 
@@ -181,11 +200,11 @@ def run_translation(text):
             messages=[
                 {
                     "role": "system",
-                    "content": TRANSLATION_PROMPT,
+                    "content": system_prompt,
                 },
                 {
                     "role": "user",
-                    "content": text,
+                    "content": user_text,
                 },
             ],
             max_completion_tokens=800,
@@ -216,21 +235,44 @@ def run_translation(text):
         return clean_response(output)
 
     except Exception as e:
-        logger.error("OpenAI Translation Error: %s", e, exc_info=True)
+        logger.error("OpenAI Error: %s", e, exc_info=True)
         return "⚠️ HATA (debug): " + str(e)
 
 
 # =========================================================
-# HAKKINDA
+# COMMAND HANDLERS
 # =========================================================
 
 async def about_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "🤖 Viyana AI\n\n"
         "Ben EHED tarafından oluşturulmuş "
-        "Viyana AI otomatik çeviri botuyum."
+        "Viyana AI otomatik çeviri ve asistan botuyum."
     )
     await update.effective_message.reply_text(about_text)
+
+
+async def mode_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global current_persona_mode
+
+    if not context.args:
+        await update.effective_message.reply_text(
+            f"Mevcut mod: **{current_persona_mode.upper()}**\n\n"
+            "Mod değiştirmek için: `/mod laz`, `/mod kurt` veya `/mod normal` yazabilirsiniz.",
+            parse_mode="Markdown"
+        )
+        return
+
+    new_mode = context.args[0].lower()
+
+    if new_mode in ["laz", "kurt", "normal"]:
+        current_persona_mode = new_mode
+        await update.effective_message.reply_text(
+            f"✅ Bot modu başarıyla **{current_persona_mode.upper()}** olarak değiştirildi.",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.effective_message.reply_text("⚠️ Geçersiz mod! Kullanılabilir modlar: `laz`, `kurt`, `normal`")
 
 
 # =========================================================
@@ -249,7 +291,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = message.text.strip()
 
-    # Sadece DM'de ve tam olarak 02021995 ile başlayan mesajlar
+    # Sadece DM'de ve tam olarak 02021995 ile başlayan mesajlar (Yayın)
     if update.effective_chat.type == "private" and text.startswith("02021995"):
         text_to_send = text[8:].strip()
 
@@ -285,9 +327,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not text or text.startswith("/"):
         return
 
+    bot_username = context.bot.username
+    is_mentioned = False
+
+    # Mesajda bot etiketlenmiş mi veya bota cevap mı veriliyor kontrol et
+    if bot_username and f"@{bot_username}" in text:
+        is_mentioned = True
+        text = text.replace(f"@{bot_username}", "").strip()
+    elif message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
+        is_mentioned = True
+
+    # 1. DURUM: EĞER BOT ETİKETLENDİYSE -> ASİSTAN MODU
+    if is_mentioned:
+        if not text:
+            text = "Ne var ne bağırıyon?"
+
+        logger.info("AI Chat Request (%s mode): %s", current_persona_mode, text)
+
+        if current_persona_mode == "laz":
+            prompt_to_use = LAZ_PERSONA_PROMPT
+        elif current_persona_mode == "kurt":
+            prompt_to_use = KURT_PERSONA_PROMPT
+        else:
+            prompt_to_use = NORMAL_PERSONA_PROMPT
+
+        ai_response = ask_openai(prompt_to_use, text)
+
+        if ai_response:
+            await message.reply_text(ai_response)
+        return
+
+    # 2. DURUM: ETİKETLENMEDİYSE -> NORMAL OTOMATİK ÇEVİRİ
     logger.info("Translation request: %s", text)
 
-    translation = run_translation(text)
+    translation = ask_openai(TRANSLATION_PROMPT, text)
 
     if translation is None or not translation:
         return
@@ -320,10 +393,11 @@ def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("hakkinda", about_handler))
+    app.add_handler(CommandHandler("mod", mode_handler))
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
     app.add_error_handler(error_handler)
 
-    logger.info("🤖 Viyana AI otomatik çeviri botu aktif!")
+    logger.info("🤖 Viyana AI otomatik çeviri ve asistan botu aktif!")
     app.run_polling(drop_pending_updates=True)
 
 
