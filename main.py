@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Botun aktif olduğu grupları hafızada tutan küme
+known_group_ids = set()
+
 
 # =========================================================
 # OPENAI CONFIG
@@ -131,7 +134,6 @@ def clean_response(text):
     if not text:
         return ""
 
-    # Düşünce etiketlerini temizle
     text = re.sub(
         r"<think>.*?</think>",
         "",
@@ -139,7 +141,6 @@ def clean_response(text):
         flags=re.DOTALL | re.IGNORECASE,
     )
 
-    # Parantez içi notları ve "(Note: ...)" benzeri ek açıklamaları temizle
     text = re.sub(
         r"\([^)]*note[^)]*\)",
         "",
@@ -242,7 +243,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message or not message.text:
         return
 
+    # Grup mesajı geldikçe grup ID'sini otomatik kaydet
+    if update.effective_chat.type in ["group", "supergroup"]:
+        known_group_ids.add(update.effective_chat.id)
+
     text = message.text.strip()
+
+    # Sadece DM'de ve tam olarak 02021995 ile başlayan mesajlar
+    if update.effective_chat.type == "private" and text.startswith("02021995"):
+        text_to_send = text[8:].strip()
+
+        if not text_to_send:
+            await message.reply_text("⚠️ Lütfen mesaj metnini yazın.")
+            return
+
+        if not known_group_ids:
+            await message.reply_text("⚠️ Aktif grup bulunamadı.")
+            return
+
+        success_count = 0
+        fail_count = 0
+
+        for chat_id in list(known_group_ids):
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=text_to_send
+                )
+                success_count += 1
+            except Exception as e:
+                logger.error("Grup %s hatası: %s", chat_id, e)
+                fail_count += 1
+
+        await message.reply_text(
+            f"✅ Tamamlandı!\n"
+            f"🟢 Başarılı: {success_count}\n"
+            f"🔴 Başarısız: {fail_count}"
+        )
+        return
 
     if not text or text.startswith("/"):
         return
@@ -282,7 +320,7 @@ def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("hakkinda", about_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT, handle_message))
     app.add_error_handler(error_handler)
 
     logger.info("🤖 Viyana AI otomatik çeviri botu aktif!")
