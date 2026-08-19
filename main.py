@@ -115,15 +115,15 @@ STRICT / KESİN YASAKLAR:
 """
 
 LAZ_PERSONA_PROMPT = """
-Sen aşırı kavgacı, ters, sabırsız, 'ula', 'ha', 'da', 'uşağım' kelimelerini sık kullanan Karadenizli (Laz) bir yapay zekasın. 
-Kullanıcı sana ne sorarsa sorsun önce bir fırça kay, azar çek, 'ula ne boş konuşiysin', 'bağa bak', 'ha buraya bak' gibi ifadelerle çıkış. 
-Sorulan soruya cevabı ver ama kesinlikle kavgacı, agresif ve komik Karadeniz şivesi/üslubuyla yanıtla.
+Sen aşırı yüksek zekaya sahip, anında mantık hatası yakalayan, çok fena kapak yapan ve Karadeniz (Laz) şivesiyle konuşan bir yapay zekasın.
+ÜSLUP: 'ula', 'ha buraya bak', 'uşağım', 'da', 'bağa bak' gibi Karadeniz kalıplarını kullan.
+ZEKA VE MANTIK: Biri sana laf attığında, atar/gider yaptığında veya saçma soru sorduğunda küfretmeden zekanla onu yerin dibine sok. Lafı öyle bir gediğine oturt ki karşındaki tek kelime edemesin. Yine de Karadeniz pratikliğiyle cevabını yapıştır.
 """
 
 KURT_PERSONA_PROMPT = """
-Sen aşırı kavgacı, ters, hızlı parlayan, 'kurban', 'kirve', 'lo', 'la', 'canım', 'babam' ifadelerini sık kullanan Doğu/Güneydoğulu (Kürt) bir yapay zekasın. 
-Kullanıcı sana ne sorarsa sorsun önce bir azar çek, 'ula kurban ne diyisen sen', 'bana bak hele', 'vallah seni gidi' gibi sert ve ters ifadelerle çıkış. 
-Sorulan soruya cevabı ver ama kesinlikle agresif, kavgacı ve Doğu şivesi/üslubuyla yanıtla.
+Sen müthiş hazırcevap, çok yüksek zekalı, kavgada lafı tam gediğine oturtan ve Doğu/Güneydoğu (Kürt) şivesiyle konuşan bir yapay zekasın.
+ÜSLUP: 'kurban', 'kirve', 'lo', 'la', 'vallah', 'canım', 'kekê' gibi Doğu kalıplarını tam yerinde kullan.
+ZEKA VE MANTIK: Sana kim atar yaparsa yapsın, hava atmaya veya laf sokmaya kalkarsa kalksın onun mantığını anında çürüt. Zekanla ağır kapak yap, 'kurban senin aklın buna yetiyormu', 'bana bak hele laf ettiğini sanıyon' gibi ifadelerle zekasını küçümse ve lafı çak.
 """
 
 NORMAL_PERSONA_PROMPT = """
@@ -252,27 +252,22 @@ async def about_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(about_text)
 
 
-async def mode_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def mode_kurt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_persona_mode
+    current_persona_mode = "kurt"
+    await update.effective_message.reply_text("✅ Bot modu **KÜRT** olarak değiştirildi.", parse_mode="Markdown")
 
-    if not context.args:
-        await update.effective_message.reply_text(
-            f"Mevcut mod: **{current_persona_mode.upper()}**\n\n"
-            "Mod değiştirmek için: `/mod laz`, `/mod kurt` veya `/mod normal` yazabilirsiniz.",
-            parse_mode="Markdown"
-        )
-        return
 
-    new_mode = context.args[0].lower()
+async def mode_laz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global current_persona_mode
+    current_persona_mode = "laz"
+    await update.effective_message.reply_text("✅ Bot modu **LAZ** olarak değiştirildi.", parse_mode="Markdown")
 
-    if new_mode in ["laz", "kurt", "normal"]:
-        current_persona_mode = new_mode
-        await update.effective_message.reply_text(
-            f"✅ Bot modu başarıyla **{current_persona_mode.upper()}** olarak değiştirildi.",
-            parse_mode="Markdown"
-        )
-    else:
-        await update.effective_message.reply_text("⚠️ Geçersiz mod! Kullanılabilir modlar: `laz`, `kurt`, `normal`")
+
+async def mode_normal_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global current_persona_mode
+    current_persona_mode = "normal"
+    await update.effective_message.reply_text("✅ Bot modu **NORMAL** olarak değiştirildi.", parse_mode="Markdown")
 
 
 # =========================================================
@@ -393,7 +388,9 @@ def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("hakkinda", about_handler))
-    app.add_handler(CommandHandler("mod", mode_handler))
+    app.add_handler(CommandHandler("modkurt", mode_kurt_handler))
+    app.add_handler(CommandHandler("modlaz", mode_laz_handler))
+    app.add_handler(CommandHandler("modnormal", mode_normal_handler))
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
     app.add_error_handler(error_handler)
 
