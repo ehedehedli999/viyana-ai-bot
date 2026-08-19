@@ -232,9 +232,6 @@ def ask_openai(system_prompt, user_text):
                 },
             ],
             max_completion_tokens=400,
-            temperature=0.3,
-            presence_penalty=0.6,
-            frequency_penalty=0.6,
         )
 
         usage = getattr(response, "usage", None)
