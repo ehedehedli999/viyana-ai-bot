@@ -33,7 +33,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 known_group_ids = set()
-current_persona_mode = "laz"
 
 
 # =========================================================
@@ -90,47 +89,24 @@ def current_daily_cost():
 # =========================================================
 
 TRANSLATION_PROMPT = """
-Sen doğrudan çalışan profesyonel bir çevirmensin. Asla açıklama ekleme, yorum yapma, selamlama.
-Görevin: Gelen metni tespit et ve kaynak dil dışındaki 2 ana dile çevir.
+Sen C2 seviyesinde ana dil yetkinliğine sahip, üst düzey profesyonel bir çevirmensin. Asla açıklama ekleme, yorum yapma, selamlama.
+Görevin: Gelen metnin kaynak dilini tespit et ve hedef diller olan TÜRKÇE ve RUSÇA'ya en doğru, bağlamsal, akıcı ve profesyonel şekilde çevir.
 
 Gelen metin TÜRKÇE ise:
-🇷🇺 [Rusça]
-🇩🇪 [Almanca]
-
-Gelen metin ALMANCA ise:
-🇹🇷 [Türkçe]
-🇷🇺 [Rusça]
+🇷🇺 [Rusça çevirisi]
 
 Gelen metin RUSÇA ise:
-🇹🇷 [Türkçe]
-🇩🇪 [Almanca]
+🇹🇷 [Türkçe çevirisi]
 
-Diğer tüm diller için:
-🇹🇷 [Türkçe]
-🇷🇺 [Rusça]
-🇩🇪 [Almanca]
+Gelen metin farklı bir dilde (örneğin İngilizce vb.) ise:
+🇹🇷 [Türkçe çevirisi]
+🇷🇺 [Rusça çevirisi]
 
-Kural: Sadece bayrak emojisi ve çeviriyi yaz. Tek satır kullan.
+Kural: Sadece bayrak emojisi ve profesyonel çeviriyi yaz. Kelimesi kelimesine değil, anlam bütünlüğünü koruyan C2 seviyesinde profesyonel bir dil kullan.
 """
 
-LAZ_PERSONA_PROMPT = """
-Sen aşırı yüksek zekaya sahip, anında mantık hatası yakalayan, çok fena kapak yapan ve Karadeniz (Laz) şivesiyle konuşan bir yapay zekasın.
-ÜSLUP: 'ula', 'ha buraya bak', 'uşağım', 'da', 'bağa bak' gibi Karadeniz kalıplarını kullan.
-ZEKA VE MANTIK: Biri sana laf attığında, atar/gider yaptığında veya saçma soru sorduğunda küfretmeden zekanla onu yerin dibine sok.
-"""
-
-KURT_PERSONA_PROMPT = """
-Sen müthiş hazırcevap, çok yüksek zekalı, kavgada lafı tam gediğine oturtan ve Doğu/Güneydoğu (Kürt) şivesiyle konuşan bir yapay zekasın.
-ÜSLUP: 'kurban', 'kirve', 'lo', 'la', 'vallah', 'canım', 'kekê' gibi Doğu kalıplarını tam yerinde kullan.
-"""
-
-HITLER_PERSONA_PROMPT = """
-Sen son derece sert, otoriter, mutlak disiplin hastası, yüksek askeri mantıkla konuşan, tavizsiz ve agresif bir Führer/Diktatör karakterisin.
-ÜSLUP: Almanca kalıpları (Nein!, Ya!, Das ist ein Befehl!, Schweig!, Achtung!) ara sıra cümlelerine ekle.
-"""
-
-NORMAL_PERSONA_PROMPT = """
-Sen yardımcı, saygılı ve akıllı bir yapay zeka asistanısın. Kullanıcının sorularına net ve kibar cevaplar ver.
+ASSISTANT_PROMPT = """
+Sen son derece zeki, analitik, bilge ve üst düzey profesyonel bir yapay zeka asistanısın. Kullanıcıların sorularına net, doğru, etkileyici, akıllıca ve kapsamlı yanıtlar ver.
 """
 
 
@@ -210,7 +186,7 @@ def ask_openai(system_prompt, user_text):
                     "content": user_text,
                 },
             ],
-            max_tokens=200,
+            max_tokens=300,
             temperature=0.3,
         )
 
@@ -249,34 +225,10 @@ def ask_openai(system_prompt, user_text):
 async def about_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     about_text = (
         "🤖 Viyana AI\n\n"
-        "Ben EHED tarafından oluşturulmuş "
-        "Viyana AI otomatik çeviri ve asistan botuyum."
+        "Ben EHED tarafından oluşturulmuş C2 düzeyinde profesyonel "
+        "Rusça-Türkçe çeviri ve zeki asistan botuyum."
     )
     await update.effective_message.reply_text(about_text)
-
-
-async def mode_kurt_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_persona_mode
-    current_persona_mode = "kurt"
-    await update.effective_message.reply_text("✅ Bot modu **KÜRT** olarak değiştirildi.", parse_mode="Markdown")
-
-
-async def mode_laz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_persona_mode
-    current_persona_mode = "laz"
-    await update.effective_message.reply_text("✅ Bot modu **LAZ** olarak değiştirildi.", parse_mode="Markdown")
-
-
-async def mode_hitler_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_persona_mode
-    current_persona_mode = "hitler"
-    await update.effective_message.reply_text("✅ Bot modu **HITLER** olarak değiştirildi.", parse_mode="Markdown")
-
-
-async def mode_normal_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global current_persona_mode
-    current_persona_mode = "normal"
-    await update.effective_message.reply_text("✅ Bot modu **NORMAL** olarak değiştirildi.", parse_mode="Markdown")
 
 
 # =========================================================
@@ -338,29 +290,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif message.reply_to_message and message.reply_to_message.from_user.id == context.bot.id:
         is_mentioned = True
 
-    # 1. BOT ETİKETLENDİYSE -> ASİSTAN MODU
+    # 1. BOT ETİKETLENDİYSE -> ZEKİ ASİSTAN MODU
     if is_mentioned:
         if not text:
-            text = "Ne var ne bağırıyon?"
+            text = "Nasıl yardımcı olabilirim?"
 
-        logger.info("AI Chat Request (%s mode): %s", current_persona_mode, text)
+        logger.info("AI Assistant Request: %s", text)
 
-        if current_persona_mode == "laz":
-            prompt_to_use = LAZ_PERSONA_PROMPT
-        elif current_persona_mode == "kurt":
-            prompt_to_use = KURT_PERSONA_PROMPT
-        elif current_persona_mode == "hitler":
-            prompt_to_use = HITLER_PERSONA_PROMPT
-        else:
-            prompt_to_use = NORMAL_PERSONA_PROMPT
-
-        ai_response = ask_openai(prompt_to_use, text)
+        ai_response = ask_openai(ASSISTANT_PROMPT, text)
 
         if ai_response:
             await message.reply_text(ai_response)
         return
 
-    # 2. BOT ETİKETLENMEDİYSEN -> OTOMATİK ÇEVİRİ
+    # 2. BOT ETİKETLENMEDİYSE -> C2 PROFESYONEL ÇEVİRİ (TÜRKÇE - RUSÇA)
     logger.info("Translation request: %s", text)
 
     translation = ask_openai(TRANSLATION_PROMPT, text)
@@ -396,14 +339,10 @@ def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("hakkinda", about_handler))
-    app.add_handler(CommandHandler("modkurt", mode_kurt_handler))
-    app.add_handler(CommandHandler("modlaz", mode_laz_handler))
-    app.add_handler(CommandHandler("modhitler", mode_hitler_handler))
-    app.add_handler(CommandHandler("modnormal", mode_normal_handler))
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
     app.add_error_handler(error_handler)
 
-    logger.info("🤖 Viyana AI otomatik çeviri ve asistan botu aktif!")
+    logger.info("🤖 Viyana AI zeki asistan ve profesyonel çeviri botu aktif!")
     app.run_polling(drop_pending_updates=True)
 
 
